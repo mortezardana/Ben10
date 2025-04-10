@@ -1,0 +1,10 @@
+2025-04-10 21:56:06,830 - baseline_ml - INFO - Starting baseline ML training pipeline...
+2025-04-10 21:56:06,830 - baseline_ml - DEBUG - Initial shape: (31457, 162)
+2025-04-10 21:56:06,881 - baseline_ml - DEBUG - Shape after dropping NaNs: (31457, 162)
+2025-04-10 21:56:06,923 - baseline_ml - INFO - Data split complete
+2025-04-10 21:56:06,923 - baseline_ml - DEBUG - Train: (22019, 160), Val: (3146, 160), Test: (6292, 160)
+2025-04-10 21:56:06,923 - baseline_ml - INFO - Training XGBoost model...
+2025-04-10 21:56:08,834 - baseline_ml - INFO - Model training complete
+2025-04-10 21:56:08,912 - baseline_ml - INFO - Test Accuracy: 1.0000
+2025-04-10 21:56:08,912 - baseline_ml - DEBUG - Classification Report: {'0': {'precision': 1.0, 'recall': 1.0, 'f1-score': 1.0, 'support': 3074.0}, '1': {'precision': 1.0, 'recall': 1.0, 'f1-score': 1.0, 'support': 3218.0}, 'accuracy': 1.0, 'macro avg': {'precision': 1.0, 'recall': 1.0, 'f1-score': 1.0, 'support': 6292.0}, 'weighted avg': {'precision': 1.0, 'recall': 1.0, 'f1-score': 1.0, 'support': 6292.0}}
+2025-04-10 21:56:08,918 - baseline_ml - INFO - Model saved to models/xgb_baseline.pkl

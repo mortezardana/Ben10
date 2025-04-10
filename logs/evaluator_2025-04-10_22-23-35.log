@@ -1,0 +1,11 @@
+2025-04-10 22:23:44,038 - evaluator - INFO - Plotting equity curve
+2025-04-10 22:23:44,364 - evaluator - INFO - Plotting predictions vs actual targets
+2025-04-10 22:23:47,917 - evaluator - INFO - Plotting confusion matrix
+2025-04-10 22:23:48,134 - evaluator - INFO - Plotting rolling Sharpe ratio
+2025-04-10 22:23:48,459 - evaluator - INFO - Plotting feature importance
+2025-04-10 22:24:40,001 - evaluator - INFO - Plotting equity curve
+2025-04-10 22:24:40,298 - evaluator - INFO - Plotting predictions vs actual targets
+2025-04-10 22:24:43,159 - evaluator - INFO - Plotting confusion matrix
+2025-04-10 22:25:18,781 - evaluator - INFO - Plotting equity curve
+2025-04-10 22:25:19,085 - evaluator - INFO - Plotting predictions vs actual targets
+2025-04-10 22:25:21,647 - evaluator - INFO - Plotting confusion matrix

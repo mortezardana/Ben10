@@ -1,0 +1,46 @@
+# Core Libraries
+pandas
+numpy
+scikit-learn
+joblib
+
+# Machine Learning
+xgboost
+lightgbm
+mlxtend
+
+# Deep Learning
+tensorflow
+keras
+keras-tcn
+torch
+torchvision
+
+# Time Series & Indicators
+#ta
+#ta-lib
+
+# Reinforcement Learning
+stable-baselines3
+gym
+FinRL
+
+# Visualization
+matplotlib
+seaborn
+plotly
+
+# Dimensionality Reduction & Clustering
+umap-learn
+scikit-learn-extra
+
+# Backtesting
+backtrader
+vectorbt
+
+# Utility
+tqdm
+pyyaml
+loguru
+
+streamlit

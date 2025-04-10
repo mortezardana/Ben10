@@ -1,0 +1,8 @@
+2025-04-10 22:56:52,983 - cnn_lstm - INFO - Preparing data for CNN-LSTM training
+2025-04-10 22:56:53,418 - cnn_lstm - DEBUG - Created sequences: (31425, 32, 161), Labels: (31425,)
+2025-04-10 22:56:53,418 - cnn_lstm - INFO - Data split complete for CNN-LSTM
+2025-04-10 22:56:53,627 - cnn_lstm - INFO - Training CNN-LSTM model...
+2025-04-10 22:57:20,224 - cnn_lstm - INFO - Evaluating CNN-LSTM model
+2025-04-10 22:57:21,301 - cnn_lstm - INFO - CNN-LSTM Test Accuracy: 0.5045
+2025-04-10 22:57:21,373 - cnn_lstm - INFO - Generating predictions with trained CNN-LSTM model
+2025-04-10 22:57:25,410 - cnn_lstm - INFO - Predictions generated for 31425 samples

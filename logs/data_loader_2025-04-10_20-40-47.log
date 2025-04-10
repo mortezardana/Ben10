@@ -1,0 +1,2 @@
+2025-04-10 20:40:47,386 - data_loader - INFO - Loading data from data\gold_4h.csv
+2025-04-10 20:40:47,915 - data_loader - DEBUG - Raw data shape: (31457, 161)

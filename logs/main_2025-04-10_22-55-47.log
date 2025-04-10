@@ -1,0 +1,5 @@
+2025-04-10 22:55:47,806 - main - INFO - Starting Gold Trading AI pipeline
+2025-04-10 22:55:50,628 - main - INFO - XGBoost Accuracy: 1.0000
+2025-04-10 22:56:38,385 - main - INFO - LSTM Accuracy: 0.4902
+2025-04-10 22:57:21,373 - main - INFO - CNN-LSTM Accuracy: 0.5045
+2025-04-10 22:59:37,160 - main - INFO - TCN Accuracy: 0.5090

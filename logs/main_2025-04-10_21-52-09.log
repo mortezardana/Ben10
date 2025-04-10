@@ -1,0 +1,10 @@
+2025-04-10 21:52:09,668 - main - INFO - Starting Gold Trading AI pipeline
+2025-04-10 21:52:12,372 - main - INFO - Training complete. Accuracy: 1.0000
+2025-04-10 21:52:12,552 - main - INFO - Sample predictions:
+2025-04-10 21:52:12,552 - main - INFO - 0    0
+1    0
+2    1
+3    0
+4    0
+Name: prediction, dtype: int32
+2025-04-10 21:52:17,788 - main - INFO - Predictions saved to data/predictions_with_features.csv

@@ -1,0 +1,10 @@
+2025-04-10 23:01:30,423 - backtest - INFO - Running simple strategy backtest
+2025-04-10 23:01:30,488 - backtest - INFO - Total return: -100.00%
+2025-04-10 23:02:20,363 - backtest - INFO - Running simple strategy backtest
+2025-04-10 23:02:20,401 - backtest - INFO - Total return: -99.99%
+2025-04-10 23:03:02,107 - backtest - INFO - Running simple strategy backtest
+2025-04-10 23:03:02,143 - backtest - INFO - Total return: -96.41%
+2025-04-10 23:04:36,915 - backtest - INFO - Running simple strategy backtest
+2025-04-10 23:04:36,952 - backtest - INFO - Total return: -100.00%
+2025-04-10 23:06:12,673 - backtest - INFO - Running simple strategy backtest
+2025-04-10 23:06:12,710 - backtest - INFO - Total return: -99.91%

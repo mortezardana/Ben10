@@ -1,0 +1,8 @@
+2025-04-10 22:30:51,823 - tcn_model - INFO - Preparing data for TCN training
+2025-04-10 22:30:52,177 - tcn_model - DEBUG - Created sequences: (31425, 32, 161), Labels: (31425,)
+2025-04-10 22:30:52,178 - tcn_model - INFO - Data split complete for TCN
+2025-04-10 22:30:52,832 - tcn_model - INFO - Training TCN model...
+2025-04-10 22:32:24,413 - tcn_model - INFO - Evaluating TCN model
+2025-04-10 22:32:25,926 - tcn_model - INFO - TCN Test Accuracy: 0.5104
+2025-04-10 22:32:25,994 - tcn_model - INFO - Generating predictions with trained TCN model
+2025-04-10 22:32:32,495 - tcn_model - INFO - Predictions generated for 31425 samples

@@ -1,0 +1,6 @@
+2025-04-10 20:43:13,516 - baseline_ml - INFO - Starting baseline ML training pipeline...
+2025-04-10 20:43:13,516 - baseline_ml - DEBUG - Initial shape: (31457, 162)
+2025-04-10 20:43:13,566 - baseline_ml - DEBUG - Shape after dropping NaNs: (31457, 162)
+2025-04-10 20:43:13,599 - baseline_ml - INFO - Data split complete
+2025-04-10 20:43:13,599 - baseline_ml - DEBUG - Train: (22019, 161), Val: (3146, 161), Test: (6292, 161)
+2025-04-10 20:43:13,599 - baseline_ml - INFO - Training XGBoost model...

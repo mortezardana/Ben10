@@ -1,0 +1,7 @@
+2025-04-10 23:04:46,026 - transformer_model - INFO - Preparing data for Transformer training
+2025-04-10 23:04:46,380 - transformer_model - INFO - Building Transformer model
+2025-04-10 23:04:46,483 - transformer_model - INFO - Training Transformer model...
+2025-04-10 23:06:05,983 - transformer_model - INFO - Evaluating Transformer model
+2025-04-10 23:06:07,141 - transformer_model - INFO - Transformer Test Accuracy: 0.5125
+2025-04-10 23:06:07,213 - transformer_model - INFO - Generating predictions with trained Transformer model
+2025-04-10 23:06:12,603 - transformer_model - INFO - Predictions generated for 31425 samples

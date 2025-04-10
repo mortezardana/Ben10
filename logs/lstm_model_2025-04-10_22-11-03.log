@@ -1,0 +1,8 @@
+2025-04-10 22:11:16,749 - lstm_model - INFO - Preparing data for LSTM training
+2025-04-10 22:11:17,130 - lstm_model - DEBUG - Created sequences: (31425, 32, 161), Labels: (31425,)
+2025-04-10 22:11:17,131 - lstm_model - INFO - Data split complete for LSTM
+2025-04-10 22:11:17,375 - lstm_model - INFO - Training LSTM model...
+2025-04-10 22:11:49,143 - lstm_model - INFO - Evaluating LSTM model
+2025-04-10 22:11:50,307 - lstm_model - INFO - LSTM Test Accuracy: 0.4885
+2025-04-10 22:11:50,388 - lstm_model - INFO - Generating predictions using trained LSTM
+2025-04-10 22:11:59,185 - lstm_model - INFO - Generated 31425 predictions

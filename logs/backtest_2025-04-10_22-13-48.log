@@ -1,0 +1,6 @@
+2025-04-10 22:14:00,176 - backtest - INFO - Running simple strategy backtest
+2025-04-10 22:14:00,301 - backtest - INFO - Total return: -100.00%
+2025-04-10 22:14:00,301 - backtest - INFO - Sharpe ratio: -0.58
+2025-04-10 22:14:46,130 - backtest - INFO - Running simple strategy backtest
+2025-04-10 22:14:46,225 - backtest - INFO - Total return: 46988726.60%
+2025-04-10 22:14:46,225 - backtest - INFO - Sharpe ratio: 0.11

@@ -1,0 +1,5 @@
+2025-04-10 21:56:08,929 - predictor - INFO - Loading model from models\xgb_baseline.pkl
+2025-04-10 21:56:08,946 - predictor - INFO - Model loaded successfully
+2025-04-10 21:56:08,946 - predictor - INFO - Preparing data for prediction
+2025-04-10 21:56:09,025 - predictor - DEBUG - Using 160 features for prediction
+2025-04-10 21:56:09,113 - predictor - INFO - Generated 31457 predictions

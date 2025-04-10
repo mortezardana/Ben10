@@ -1,0 +1,5 @@
+2025-04-10 20:41:19,598 - data_loader - INFO - Loading data from data\gold_4h.csv
+2025-04-10 20:41:20,105 - data_loader - DEBUG - Raw data shape: (31457, 161)
+2025-04-10 20:41:20,106 - data_loader - DEBUG - Target column created
+2025-04-10 20:41:20,135 - data_loader - INFO - Data cleaned and ready. Final shape: (31457, 162)
+2025-04-10 20:41:20,135 - data_loader - INFO - Normalizing features
