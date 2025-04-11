@@ -44,3 +44,7 @@ pyyaml
 loguru
 
 streamlit
+
+mpld3
+
+pytorch_tabnet
