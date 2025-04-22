@@ -1,5 +1,7 @@
 # 🪙 Gold Trading AI Pipeline
 
+This project started as my Data Science module coursework at the University of Roehampton, and quickly grew into its own repository and project because of the complexity and advancements compared to the coursework requirement. The name of the repo, Ben10, was given for the initial 10 models that were included.
+
 This project builds a modular and extensible machine learning pipeline to predict and trade Gold (XAU/USD) based on 4-hour OHLCV data and technical indicators.
 
 It includes **10 modeling approaches**, 4 **ensemble techniques**, and supports backtesting using realistic trading strategies.
