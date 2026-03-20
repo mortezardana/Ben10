@@ -2,72 +2,112 @@
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
 from tensorflow.keras.callbacks import EarlyStopping
 from utils.logger import get_logger
+from utils.sequence_utils import create_sequences
 import tensorflow as tf
 
 logger = get_logger("lstm")
 
+SEQUENCE_LENGTH = 32
 
-def train_lstm_model(df, device=None):
+
+def train_lstm_model(df, target_col='target', device=None):
     """
-    Trains an LSTM classification model using TensorFlow.
+    Trains an LSTM classification model using TensorFlow with proper
+    sliding-window sequence inputs of shape (samples, timesteps, features).
 
     Parameters:
     - df: DataFrame containing training data
+    - target_col: Name of the target column
     - device: Optional device string ('cuda', 'cpu', etc.)
 
     Returns:
     - model: Trained LSTM model
-    - metrics: Dictionary of final loss and accuracy
+    - metrics: Dictionary with accuracy on test set
     """
-
-    # Map device to TensorFlow format
     if device and "cuda" in device.lower():
         tf_device = "/GPU:0"
     else:
         tf_device = "/CPU:0"
 
-    print(f"[INFO] Training LSTM model on {'GPU' if 'GPU' in tf_device else 'CPU'}")
+    logger.info(f"Training LSTM model on {'GPU' if 'GPU' in tf_device else 'CPU'}")
+
+    # Prepare features and target
+    feature_cols = df.drop(columns=['Date', target_col, 'prediction'], errors='ignore') \
+        .select_dtypes(include='number').columns.tolist()
+    X_raw = df[feature_cols].values
+    y_raw = df[target_col].values
+
+    # Create sliding window sequences: (n_sequences, sequence_length, n_features)
+    X_seq, y_seq = create_sequences(X_raw, y_raw, sequence_length=SEQUENCE_LENGTH)
+    logger.info(f"Created sequences: X={X_seq.shape}, y={y_seq.shape}")
+
+    # Chronological train / val / test split
+    total = len(X_seq)
+    test_size = int(0.2 * total)
+    val_size = int(0.1 * total)
+
+    X_train = X_seq[:total - val_size - test_size]
+    y_train = y_seq[:total - val_size - test_size]
+    X_val = X_seq[total - val_size - test_size:total - test_size]
+    y_val = y_seq[total - val_size - test_size:total - test_size]
+    X_test = X_seq[total - test_size:]
+    y_test = y_seq[total - test_size:]
 
     with tf.device(tf_device):
-        # Feature selection
-        feature_cols = [col for col in df.columns if col not in ['Date', 'target', 'prediction']]
-        X = df[feature_cols].values.reshape((df.shape[0], len(feature_cols), 1))
-        y = df['target'].values
+        model = Sequential()
+        model.add(LSTM(64, input_shape=(SEQUENCE_LENGTH, len(feature_cols)), return_sequences=False))
+        model.add(Dropout(0.3))
+        model.add(Dense(64, activation='relu'))
+        model.add(Dropout(0.3))
+        model.add(Dense(1, activation='sigmoid'))
 
-        # Build classification model
-        model = tf.keras.Sequential([
-            tf.keras.layers.LSTM(64, input_shape=(len(feature_cols), 1)),
-            tf.keras.layers.Dense(1, activation='sigmoid')  # sigmoid for binary classification
-        ])
+        model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
-        # Compile with accuracy metric
-        model.compile(optimizer='adam',
-                      loss='binary_crossentropy',
-                      metrics=['accuracy'])
+        es = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+        model.fit(
+            X_train, y_train,
+            validation_data=(X_val, y_val),
+            epochs=50,
+            batch_size=64,
+            callbacks=[es],
+            verbose=1
+        )
 
-        # Fit model
-        history = model.fit(X, y, epochs=10, batch_size=32, verbose=1)
+        preds = (model.predict(X_test) > 0.5).astype(int)
+        acc = accuracy_score(y_test, preds)
 
-    metrics = {
-        "loss": history.history['loss'][-1],
-        "accuracy": history.history['accuracy'][-1]
-    }
-
-    return model, metrics
+    logger.info(f"LSTM Accuracy: {acc:.4f}")
+    return model, {"accuracy": acc}
 
 
-def predict_lstm(model, df, device=None):
-    feature_cols = df.drop(columns=['Date', 'target'], errors='ignore').select_dtypes(include='number').columns.tolist()
-    X = df[feature_cols].values
-    X = X.reshape((X.shape[0], X.shape[1], 1))
-    with tf.device(f"/{device}:0" if device else "/CPU:0"):
-        preds = (model.predict(X) > 0.5).astype(int).flatten()
-    df_out = df.copy()
+def predict_lstm(model, df, target_col='target', device=None):
+    """
+    Generate predictions using a trained LSTM model with proper windowing.
+
+    Returns a DataFrame (rows aligned to df.iloc[SEQUENCE_LENGTH:]) with a
+    'prediction' column.
+    """
+    feature_cols = df.drop(columns=['Date', 'target', 'prediction'], errors='ignore') \
+        .select_dtypes(include='number').columns.tolist()
+    X_raw = df[feature_cols].values
+    y_raw = df[target_col].values if target_col in df.columns else np.zeros(len(df))
+
+    X_seq, y_seq = create_sequences(X_raw, y_raw, sequence_length=SEQUENCE_LENGTH)
+
+    if device and "cuda" in device.lower():
+        tf_device = "/GPU:0"
+    else:
+        tf_device = "/CPU:0"
+
+    with tf.device(tf_device):
+        preds = (model.predict(X_seq) > 0.5).astype(int).flatten()
+
+    df_out = df.iloc[SEQUENCE_LENGTH:].copy()
     df_out['prediction'] = preds
+    logger.info(f"Predictions generated for {len(df_out)} samples")
     return df_out

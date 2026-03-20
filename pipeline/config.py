@@ -18,8 +18,18 @@ CONFIG = {
     'random_state': 42,
     'save_model': True,
 
-    # Normalization
-    'exclude_cols': ['target', 'date'],
+    # Columns to exclude from features.
+    # 'future_returns' and 'signal' are derived from future price data and
+    # leak the target variable — they must be dropped before any processing.
+    'exclude_cols': ['target', 'date', 'future_returns', 'signal'],
+
+    # Labeling
+    'labeling': {
+        'method': 'triple_barrier',  # or 'binary'
+        'tp_multiplier': 2.0,
+        'sl_multiplier': 1.0,
+        'max_holding_period': 12,
+    },
 
     # Model hyperparameters
     'xgb_params': {

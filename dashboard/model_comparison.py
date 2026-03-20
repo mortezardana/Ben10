@@ -1,4 +1,7 @@
 # dashboard/model_comparison.py
+"""Standalone model comparison dashboard.
+Updated to handle both data/ and Data/ directories.
+"""
 
 import streamlit as st
 import pandas as pd
@@ -11,8 +14,9 @@ from sklearn.metrics import confusion_matrix
 # Load backtest results
 def load_backtest(file_path):
     df = pd.read_csv(file_path)
-    sharpe = df['strategy_return'].mean() / df['strategy_return'].std() * (252 * 6) ** 0.5
-    total_return = df['equity_curve'].iloc[-1] - 1
+    sharpe = df['strategy_return'].mean() / df['strategy_return'].std() * (252 * 6) ** 0.5 \
+        if 'strategy_return' in df.columns and df['strategy_return'].std() > 0 else None
+    total_return = df['equity_curve'].iloc[-1] - 1 if 'equity_curve' in df.columns else None
     accuracy = (df['prediction'] == df[
         'target']).mean() if 'prediction' in df.columns and 'target' in df.columns else None
     return df, accuracy, sharpe, total_return
@@ -33,9 +37,11 @@ def plot_equity(df, model_name):
 # Main dashboard app
 def main():
     st.set_page_config(page_title="Model Comparison Dashboard", layout="wide")
-    st.title("📊 Single vs Multi-Timeframe Model Comparison")
+    st.title("Single vs Multi-Timeframe Model Comparison")
 
     data_dir = Path("data")
+    if not data_dir.exists():
+        data_dir = Path("Data")
 
     model_names = ["XGBoost", "LSTM", "CNN-LSTM", "TCN", "Transformer"]
     results = []
@@ -63,7 +69,7 @@ def main():
             "Return (MTF)": f"{ret_m:.2%}" if ret_m is not None else "-",
         })
 
-    st.dataframe(pd.DataFrame(results))
+    st.dataframe(pd.DataFrame(results), use_container_width=True, hide_index=True)
 
 
 if __name__ == "__main__":

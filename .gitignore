@@ -1,2 +1,11 @@
 .idea
 ./Data/
+.claude/
+logs/
+__pycache__/
+*.pyc
+mlruns/
+data/features/
+data/external/
+results/
+.venv/

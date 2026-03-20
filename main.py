@@ -1,139 +1,161 @@
-# main.py
+# main.py — Orchestrator for Ben10 Gold Trading AI
 
-from pipeline.config import CONFIG
-from pipeline.data_loader import load_data, normalize_features
-from models.baseline_ml import train_baseline_ml
+import argparse
+import json
+from pathlib import Path
+
 from utils.logger import get_logger
-from models.predictor import load_model, predict
-from pipeline.backtest import simple_strategy_backtest
-from pipeline.evaluator import (
-    plot_equity_curve,
-    plot_predictions,
-    plot_feature_importance,
-    plot_confusion,
-    plot_rolling_sharpe
-)
-from models.lstm_model import train_lstm_model, predict_lstm
-from models.cnn_lstm import train_cnn_lstm_model, predict_cnn_lstm
-from models.tcn_model import train_tcn_model, predict_tcn
-from models.transformer_model import train_transformer_model, predict_transformer
-from models.crnn_model import train_crnn_model, predict_crnn
-from models.gru_model import train_gru_model, predict_gru
-from models.tabnet_model import train_tabnet_model, predict_tabnet
-import torch
+from utils.seed import set_all_seeds
+from shared.data_loader import load_gold_data
+from shared.config import load_config, AppConfig
+from pipeline.backtest import BacktestEngine
+from utils.benchmarks import buy_and_hold, sma_crossover
 
 logger = get_logger("main")
 
+# Registry of available pipelines
+PIPELINE_REGISTRY = {
+    'xgboost': ('pipelines.gradient_boosting.xgboost_pipeline', 'XGBoostPipeline'),
+    'lightgbm': ('pipelines.gradient_boosting.lightgbm_pipeline', 'LightGBMPipeline'),
+    'catboost': ('pipelines.gradient_boosting.catboost_pipeline', 'CatBoostPipeline'),
+    'lstm': ('pipelines.deep_learning.lstm_pipeline', 'LSTMPipeline'),
+    'gru': ('pipelines.deep_learning.gru_pipeline', 'GRUPipeline'),
+    'tcn': ('pipelines.deep_learning.tcn_pipeline', 'TCNPipeline'),
+    'transformer': ('pipelines.deep_learning.transformer_pipeline', 'TransformerPipeline'),
+    'cnn_lstm': ('pipelines.deep_learning.cnn_lstm_pipeline', 'CNNLSTMPipeline'),
+    'crnn': ('pipelines.deep_learning.crnn_pipeline', 'CRNNPipeline'),
+    'tabnet': ('pipelines.deep_learning.tabnet_pipeline', 'TabNetPipeline'),
+    'tft': ('pipelines.deep_learning.tft_pipeline', 'TFTPipeline'),
+    'hmm_regime': ('pipelines.regime.hmm_pipeline', 'HMMRegimePipeline'),
+}
+
+
+def get_pipeline(name, config=None):
+    """Dynamically import and instantiate a pipeline by name."""
+    if name not in PIPELINE_REGISTRY:
+        raise ValueError(f"Unknown pipeline: {name}. Available: {list(PIPELINE_REGISTRY.keys())}")
+    module_path, class_name = PIPELINE_REGISTRY[name]
+    import importlib
+    module = importlib.import_module(module_path)
+    cls = getattr(module, class_name)
+    return cls(config=config)
+
+
+def run_pipeline(pipeline, data, backtest_engine=None):
+    """Train, predict, evaluate, and backtest a single pipeline."""
+    train_metrics = pipeline.train(data['train'], data.get('val'))
+    logger.info(f"[{pipeline.name}] Train metrics: {train_metrics}")
+
+    # Predict on test
+    output = pipeline.predict(data['test'])
+    eval_metrics = pipeline.evaluate(data['test'])
+    logger.info(f"[{pipeline.name}] Test metrics: {eval_metrics}")
+
+    # Backtest if prices available
+    bt_result = None
+    if backtest_engine and 'Close' in data['test'].columns:
+        prices = data['test']['Close']
+        bt_result = backtest_engine.run(prices, output.signals)
+        logger.info(f"[{pipeline.name}] Backtest: {bt_result.metrics}")
+
+    return {
+        'name': pipeline.name,
+        'train_metrics': train_metrics,
+        'eval_metrics': eval_metrics,
+        'output': output,
+        'backtest': bt_result,
+    }
+
 
 def main():
-    logger.info("Starting Gold Trading AI pipeline")
+    parser = argparse.ArgumentParser(description='Ben10 Gold Trading AI')
+    parser.add_argument('--config', type=str, default='configs/default.yaml',
+                        help='Path to config YAML file')
+    parser.add_argument('--pipeline', type=str, default=None,
+                        help='Run a specific pipeline (e.g., xgboost, lstm)')
+    parser.add_argument('--run-all', action='store_true',
+                        help='Run all available pipelines')
+    parser.add_argument('--seed', type=int, default=42)
+    args = parser.parse_args()
 
-    # Select device
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    logger.info(f"Using device: {device.upper()}")
+    # Set seeds for reproducibility
+    set_all_seeds(args.seed)
 
-    # Load and preprocess data
-    df = load_data(
-        filepath=CONFIG['data_path'],
-        target_horizon=CONFIG['target_horizon'],
-        target_type=CONFIG['target_type']
-    )
-    df, scaler = normalize_features(df, exclude_cols=CONFIG['exclude_cols'])
+    # Load config
+    try:
+        config = load_config(args.config)
+    except Exception as e:
+        logger.warning(f"Could not load config from {args.config}: {e}. Using defaults.")
+        config = AppConfig()
 
-    # Train baseline model
-    model, metrics = train_baseline_ml(
-        df,
-        target_col='target',
-        test_size=CONFIG['test_size'],
-        val_size=CONFIG['val_size'],
-        random_state=CONFIG['random_state'],
-        save_model=CONFIG['save_model']
-    )
+    logger.info("Starting Ben10 Gold Trading AI pipeline")
 
-    logger.info(f"Training complete. Accuracy: {metrics['accuracy']:.4f}")
+    # Load data
+    data = load_gold_data(config)
+    logger.info(f"Data loaded: train={len(data['train'])}, val={len(data['val'])}, test={len(data['test'])}")
 
-    # Predictor testing
-    predictor(df)
+    # Backtesting engine
+    bt_engine = BacktestEngine(initial_capital=100000, commission=0.0001, slippage=0.0001)
 
-    # Run backtest
-    backtest_df = simple_strategy_backtest(df)
-    backtest_df.to_csv("data/backtest_results.csv", index=False)
-    logger.info("Backtest results saved to data/backtest_results.csv")
+    # Determine which pipelines to run
+    if args.pipeline:
+        pipeline_names = [args.pipeline]
+    elif args.run_all:
+        pipeline_names = list(PIPELINE_REGISTRY.keys())
+    else:
+        # Default: just XGBoost
+        pipeline_names = ['xgboost']
 
-    # Plotting
-    plot_equity_curve(backtest_df)
-    plot_predictions(df)
-    plot_confusion(df)
-    plot_rolling_sharpe(backtest_df)
+    # Run pipelines and collect results
+    results = {}
+    for name in pipeline_names:
+        logger.info(f"{'='*60}")
+        logger.info(f"Running pipeline: {name}")
+        logger.info(f"{'='*60}")
+        try:
+            pipeline = get_pipeline(name)
+            result = run_pipeline(pipeline, data, bt_engine)
+            results[name] = result
+        except Exception as e:
+            logger.error(f"Pipeline {name} failed: {e}")
+            import traceback
+            traceback.print_exc()
 
-    feature_cols = df.drop(columns=['target', 'prediction', 'date'], errors='ignore').select_dtypes(
-        include='number').columns.tolist()
-    plot_feature_importance(model, feature_cols)
+    # Run benchmarks for comparison
+    if 'Close' in data['test'].columns:
+        logger.info(f"{'='*60}")
+        logger.info("Running benchmarks...")
+        prices = data['test']['Close']
+        bh_equity = buy_and_hold(prices)
+        bh_return = float(bh_equity.iloc[-1] - 1) if len(bh_equity) > 0 else 0
+        logger.info(f"Buy & Hold return: {bh_return:.4f}")
 
-    # LSTM
-    lstm_model, lstm_metrics = train_lstm_model(df, device=device)
-    logger.info(f"LSTM Accuracy: {lstm_metrics['accuracy']:.4f}")
-    lstm_pred_df = predict_lstm(lstm_model, df, device=device)
-    lstm_backtest_df = simple_strategy_backtest(lstm_pred_df)
-    lstm_pred_df.to_csv("data/lstm_predictions.csv", index=False)
-    lstm_backtest_df.to_csv("data/lstm_backtest_results.csv", index=False)
-    plot_predictions(lstm_pred_df)
-    plot_confusion(lstm_pred_df)
-    plot_equity_curve(lstm_backtest_df)
+        sma_signals = sma_crossover(prices, fast=50, slow=200)
+        sma_bt = bt_engine.run(prices, sma_signals)
+        logger.info(f"SMA Crossover metrics: {sma_bt.metrics}")
 
-    # CNN-LSTM
-    cnn_lstm_model, cnn_lstm_metrics = train_cnn_lstm_model(df, device=device)
-    cnn_pred_df = predict_cnn_lstm(cnn_lstm_model, df, device=device)
-    cnn_backtest_df = simple_strategy_backtest(cnn_pred_df)
-    cnn_pred_df.to_csv("data/cnn_lstm_predictions.csv", index=False)
-    cnn_backtest_df.to_csv("data/cnn_lstm_backtest_results.csv", index=False)
-    plot_predictions(cnn_pred_df)
-    plot_confusion(cnn_pred_df)
-    plot_equity_curve(cnn_backtest_df)
+    # Summary
+    logger.info(f"\n{'='*60}")
+    logger.info("RESULTS SUMMARY")
+    logger.info(f"{'='*60}")
+    for name, result in results.items():
+        eval_m = result['eval_metrics']
+        bt_m = result['backtest'].metrics if result['backtest'] else {}
+        logger.info(f"{name}: accuracy={eval_m.get('accuracy', 'N/A')}, "
+                     f"sharpe={bt_m.get('sharpe_ratio', 'N/A')}, "
+                     f"max_dd={bt_m.get('max_drawdown', 'N/A')}")
 
-    # CRNN
-    crnn_model, crnn_metrics = train_crnn_model(df, device=device)
-    logger.info(f"CRNN Accuracy: {crnn_metrics['accuracy']:.4f}")
-    crnn_pred_df = predict_crnn(crnn_model, df, device=device)
-    crnn_backtest_df = simple_strategy_backtest(crnn_pred_df)
-    crnn_pred_df.to_csv("data/crnn_predictions.csv", index=False)
-    crnn_backtest_df.to_csv("data/crnn_backtest_results.csv", index=False)
-    plot_predictions(crnn_pred_df)
-    plot_confusion(crnn_pred_df)
-    plot_equity_curve(crnn_backtest_df)
+    # Save results
+    output_dir = Path("results")
+    output_dir.mkdir(exist_ok=True)
+    summary = {name: {
+        'eval_metrics': r['eval_metrics'],
+        'backtest_metrics': r['backtest'].metrics if r['backtest'] else {},
+    } for name, r in results.items()}
 
-    # GRU
-    gru_model, gru_metrics = train_gru_model(df, device=device)
-    logger.info(f"GRU Accuracy: {gru_metrics['accuracy']:.4f}")
-    gru_pred_df = predict_gru(gru_model, df, device=device)
-    gru_backtest_df = simple_strategy_backtest(gru_pred_df)
-    gru_pred_df.to_csv("data/gru_predictions.csv", index=False)
-    gru_backtest_df.to_csv("data/gru_backtest_results.csv", index=False)
-    plot_predictions(gru_pred_df)
-    plot_confusion(gru_pred_df)
-    plot_equity_curve(gru_backtest_df)
-
-    # TabNet
-    tabnet_model, tabnet_metrics = train_tabnet_model(df, device_name=device)
-    logger.info(f"TabNet Accuracy: {tabnet_metrics['accuracy']:.4f}")
-    tabnet_pred_df = predict_tabnet(tabnet_model, df)
-    tabnet_backtest_df = simple_strategy_backtest(tabnet_pred_df)
-    tabnet_pred_df.to_csv("data/tabnet_predictions.csv", index=False)
-    tabnet_backtest_df.to_csv("data/tabnet_backtest_results.csv", index=False)
-    plot_predictions(tabnet_pred_df)
-    plot_confusion(tabnet_pred_df)
-    plot_equity_curve(tabnet_backtest_df)
-
-
-def predictor(df):
-    model_path = CONFIG['model_output_dir'] / "xgb_baseline.pkl"
-    model = load_model(model_path)
-    preds = predict(model, df)
-    logger.info("Sample predictions:")
-    logger.info(preds.head())
-    df['prediction'] = preds
-    df.to_csv("Data/predictions_with_features.csv", index=False)
-    logger.info("Predictions saved to data/predictions_with_features.csv")
+    with open(output_dir / "pipeline_results.json", 'w') as f:
+        json.dump(summary, f, indent=2, default=str)
+    logger.info(f"Results saved to {output_dir / 'pipeline_results.json'}")
 
 
 if __name__ == '__main__':

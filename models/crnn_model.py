@@ -2,18 +2,26 @@
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Conv1D, MaxPooling1D, LSTM, Dense, Dropout
 from tensorflow.keras.callbacks import EarlyStopping
 from utils.logger import get_logger
+from utils.sequence_utils import create_sequences
 import tensorflow as tf
 
 logger = get_logger("crnn")
 
+SEQUENCE_LENGTH = 32
+
 
 def create_crnn_model(input_shape):
+    """
+    Build and compile a CRNN (Conv1D + LSTM) model.
+
+    Parameters:
+    - input_shape: tuple of (sequence_length, n_features)
+    """
     model = Sequential()
     model.add(Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=input_shape))
     model.add(MaxPooling1D(pool_size=2))
@@ -27,21 +35,50 @@ def create_crnn_model(input_shape):
 
 
 def train_crnn_model(df, target_col='target', device=None):
+    """
+    Trains a CRNN classification model with proper sliding-window sequence
+    inputs of shape (samples, timesteps, features).
+    """
     logger.info("Preparing data for CRNN")
 
-    feature_cols = df.drop(columns=['Date', target_col], errors='ignore').select_dtypes(
-        include='number').columns.tolist()
-    X = df[feature_cols].values
-    y = df[target_col].values
+    feature_cols = df.drop(columns=['Date', target_col, 'prediction'], errors='ignore') \
+        .select_dtypes(include='number').columns.tolist()
+    X_raw = df[feature_cols].values
+    y_raw = df[target_col].values
 
-    X = X.reshape((X.shape[0], X.shape[1], 1))
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
+    # Create sliding window sequences: (n_sequences, sequence_length, n_features)
+    X_seq, y_seq = create_sequences(X_raw, y_raw, sequence_length=SEQUENCE_LENGTH)
+    logger.info(f"Created sequences: X={X_seq.shape}, y={y_seq.shape}")
+
+    # Chronological train / val / test split
+    total = len(X_seq)
+    test_size = int(0.2 * total)
+    val_size = int(0.1 * total)
+
+    X_train = X_seq[:total - val_size - test_size]
+    y_train = y_seq[:total - val_size - test_size]
+    X_val = X_seq[total - val_size - test_size:total - test_size]
+    y_val = y_seq[total - val_size - test_size:total - test_size]
+    X_test = X_seq[total - test_size:]
+    y_test = y_seq[total - test_size:]
 
     logger.info(f"Training CRNN model on {'GPU' if tf.config.list_physical_devices('GPU') else 'CPU'}")
-    with tf.device(f"/{device}:0" if device else "/CPU:0"):
-        model = create_crnn_model(X_train.shape[1:])
+    if device and "cuda" in device.lower():
+        tf_device = "/GPU:0"
+    else:
+        tf_device = "/CPU:0"
+
+    with tf.device(tf_device):
+        model = create_crnn_model((SEQUENCE_LENGTH, len(feature_cols)))
         es = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
-        model.fit(X_train, y_train, epochs=50, batch_size=64, validation_split=0.2, callbacks=[es], verbose=0)
+        model.fit(
+            X_train, y_train,
+            validation_data=(X_val, y_val),
+            epochs=50,
+            batch_size=64,
+            callbacks=[es],
+            verbose=0
+        )
 
         preds = (model.predict(X_test) > 0.5).astype(int)
         acc = accuracy_score(y_test, preds)
@@ -50,12 +87,29 @@ def train_crnn_model(df, target_col='target', device=None):
     return model, {"accuracy": acc}
 
 
-def predict_crnn(model, df, device=None):
-    feature_cols = df.drop(columns=['Date', 'target'], errors='ignore').select_dtypes(include='number').columns.tolist()
-    X = df[feature_cols].values
-    X = X.reshape((X.shape[0], X.shape[1], 1))
-    with tf.device(f"/{device}:0" if device else "/CPU:0"):
-        preds = (model.predict(X) > 0.5).astype(int).flatten()
-    df_out = df.copy()
+def predict_crnn(model, df, target_col='target', device=None):
+    """
+    Generate predictions using a trained CRNN model with proper windowing.
+
+    Returns a DataFrame (rows aligned to df.iloc[SEQUENCE_LENGTH:]) with a
+    'prediction' column.
+    """
+    feature_cols = df.drop(columns=['Date', 'target', 'prediction'], errors='ignore') \
+        .select_dtypes(include='number').columns.tolist()
+    X_raw = df[feature_cols].values
+    y_raw = df[target_col].values if target_col in df.columns else np.zeros(len(df))
+
+    X_seq, y_seq = create_sequences(X_raw, y_raw, sequence_length=SEQUENCE_LENGTH)
+
+    if device and "cuda" in device.lower():
+        tf_device = "/GPU:0"
+    else:
+        tf_device = "/CPU:0"
+
+    with tf.device(tf_device):
+        preds = (model.predict(X_seq) > 0.5).astype(int).flatten()
+
+    df_out = df.iloc[SEQUENCE_LENGTH:].copy()
     df_out['prediction'] = preds
+    logger.info(f"Predictions generated for {len(df_out)} samples")
     return df_out

@@ -1,0 +1,36 @@
+# XGBoost / Gradient Boosting pipeline configuration
+name: xgboost
+model_type: gradient_boosting
+
+params:
+  # Core booster parameters
+  n_estimators: 300
+  learning_rate: 0.03
+  max_depth: 5
+  min_child_weight: 3
+
+  # Regularization
+  subsample: 0.8
+  colsample_bytree: 0.8
+  gamma: 0.1
+  reg_alpha: 0.01
+  reg_lambda: 1.0
+
+  # Training
+  objective: binary:logistic
+  eval_metric: logloss
+  early_stopping_rounds: 30
+  verbosity: 0
+  n_jobs: -1
+  random_state: 42
+
+  # Class imbalance
+  scale_pos_weight: 1.0
+
+# Feature selection (null means use all available)
+features: null
+
+# Calibration settings
+calibration:
+  method: isotonic
+  cv_folds: 5

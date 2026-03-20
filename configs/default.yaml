@@ -1,0 +1,36 @@
+random_state: 42
+environment: dev
+
+data:
+  data_path: Data/gold_4h.csv
+  target_type: classification
+  target_horizon: 1
+  test_size: 0.2
+  val_size: 0.1
+  exclude_cols:
+    - target
+    - date
+    - Date
+    - future_returns
+    - signal
+  labeling:
+    method: triple_barrier
+    tp_multiplier: 2.0
+    sl_multiplier: 1.0
+    max_holding_period: 12
+  sampling:
+    method: all
+
+pipelines:
+  - name: xgboost
+    model_type: gradient_boosting
+    params:
+      n_estimators: 300
+      learning_rate: 0.03
+      max_depth: 5
+      subsample: 0.8
+      colsample_bytree: 0.8
+
+combiner:
+  method: weighted_voting
+  confidence_threshold: 0.6

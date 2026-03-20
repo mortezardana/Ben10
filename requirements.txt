@@ -25,6 +25,9 @@ stable-baselines3
 gym
 FinRL
 
+# Explainability
+shap
+
 # Visualization
 matplotlib
 seaborn
@@ -38,6 +41,11 @@ scikit-learn-extra
 backtrader
 vectorbt
 
+# Statistical
+statsmodels
+scipy
+pydantic
+
 # Utility
 tqdm
 pyyaml
@@ -48,3 +56,9 @@ streamlit
 mpld3
 
 pytorch_tabnet
+
+catboost
+hmmlearn
+
+# Experiment Tracking
+mlflow
