@@ -17,10 +17,14 @@ def drop_cdl_columns(df):
 def drop_correlated_features(df, threshold=0.95, exclude_cols=None):
     """
     Drop one of each pair of features with correlation > threshold.
-    Keeps the one with higher variance.
+    Keeps the one with higher variance. Never drops OHLCV columns.
     """
     if exclude_cols is None:
         exclude_cols = ['target', 'date', 'Date']
+
+    # Protect core OHLCV columns — they're needed for target creation and backtesting
+    protected = {'Open', 'High', 'Low', 'Close', 'Volume'}
+    exclude_cols = list(set(exclude_cols) | protected)
 
     numeric = df.select_dtypes(include='number')
     numeric = numeric.drop(columns=[c for c in exclude_cols if c in numeric.columns], errors='ignore')
