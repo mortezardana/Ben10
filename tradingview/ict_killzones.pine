@@ -1,0 +1,43 @@
+// =============================================================================
+// ICT Killzones & Session Timing — Ben10
+// =============================================================================
+// Highlights the key trading sessions where institutional activity peaks.
+// Times are in exchange timezone (adjust if needed).
+//
+// Asian Session:  20:00 - 00:00 EST
+// London Open:    02:00 - 05:00 EST
+// NY Open:        07:00 - 10:00 EST
+// London Close:   10:00 - 12:00 EST
+// =============================================================================
+
+//@version=6
+indicator("ICT Killzones", overlay=true)
+
+// Inputs
+showAsian   = input.bool(true, "Show Asian Session")
+showLondon  = input.bool(true, "Show London Open")
+showNY      = input.bool(true, "Show NY Open")
+showLClose  = input.bool(true, "Show London Close")
+
+asianColor  = input.color(color.new(color.purple, 90), "Asian Color")
+londonColor = input.color(color.new(color.blue, 90), "London Color")
+nyColor     = input.color(color.new(color.orange, 90), "NY Open Color")
+lcloseColor = input.color(color.new(color.gray, 90), "London Close Color")
+
+// Use exchange timezone
+h = hour(time, "America/New_York")
+
+isAsian = (h >= 20 or h < 0) and showAsian
+isLondon = (h >= 2 and h < 5) and showLondon
+isNY = (h >= 7 and h < 10) and showNY
+isLClose = (h >= 10 and h < 12) and showLClose
+
+bgcolor(isAsian ? asianColor : na, title="Asian Session")
+bgcolor(isLondon ? londonColor : na, title="London Open")
+bgcolor(isNY ? nyColor : na, title="NY Open")
+bgcolor(isLClose ? lcloseColor : na, title="London Close")
+
+// Day separator
+isDayChange = ta.change(time("D")) != 0
+if isDayChange
+    line.new(bar_index, high, bar_index, low, extend=extend.both, color=color.new(color.gray, 70), style=line.style_dotted, width=1)

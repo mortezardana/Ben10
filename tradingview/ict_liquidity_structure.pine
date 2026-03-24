@@ -1,0 +1,149 @@
+// =============================================================================
+// ICT Liquidity Levels, Sweeps & Market Structure — Ben10
+// =============================================================================
+// - Marks swing highs (buy-side liquidity) and swing lows (sell-side liquidity)
+// - Detects liquidity sweeps (stop hunts)
+// - Tracks market structure (HH/HL = bullish, LH/LL = bearish)
+// - Marks Break of Structure (BOS)
+// =============================================================================
+
+//@version=6
+indicator("ICT Liquidity & Structure", overlay=true, max_lines_count=500, max_labels_count=500)
+
+// Inputs
+swingPeriod   = input.int(10, "Swing Detection Period", minval=3, maxval=50)
+showLiqLines  = input.bool(true, "Show Liquidity Lines")
+showSweeps    = input.bool(true, "Show Sweep Signals")
+showBOS       = input.bool(true, "Show Break of Structure")
+showStructure = input.bool(true, "Show Structure Labels")
+buyLiqColor   = input.color(color.new(color.red, 40), "Buy-side Liquidity")
+sellLiqColor  = input.color(color.new(color.green, 40), "Sell-side Liquidity")
+maxLines      = input.int(20, "Max Visible Levels", minval=5, maxval=50)
+
+// Swing High detection
+isSwingHigh = ta.pivothigh(high, swingPeriod, swingPeriod)
+isSwingLow = ta.pivotlow(low, swingPeriod, swingPeriod)
+
+// Track swing levels
+var float[] swingHighs = array.new_float()
+var int[] swingHighBars = array.new_int()
+var line[] shLines = array.new_line()
+
+var float[] swingLows = array.new_float()
+var int[] swingLowBars = array.new_int()
+var line[] slLines = array.new_line()
+
+// Add new swing high
+if not na(isSwingHigh) and showLiqLines
+    shPrice = isSwingHigh
+    array.push(swingHighs, shPrice)
+    array.push(swingHighBars, bar_index - swingPeriod)
+    l = line.new(bar_index - swingPeriod, shPrice, bar_index, shPrice, color=buyLiqColor, style=line.style_dashed, width=1)
+    array.push(shLines, l)
+    // Trim old levels
+    if array.size(swingHighs) > maxLines
+        array.shift(swingHighs)
+        array.shift(swingHighBars)
+        line.delete(array.shift(shLines))
+
+// Add new swing low
+if not na(isSwingLow) and showLiqLines
+    slPrice = isSwingLow
+    array.push(swingLows, slPrice)
+    array.push(swingLowBars, bar_index - swingPeriod)
+    l = line.new(bar_index - swingPeriod, slPrice, bar_index, slPrice, color=sellLiqColor, style=line.style_dashed, width=1)
+    array.push(slLines, l)
+    if array.size(swingLows) > maxLines
+        array.shift(swingLows)
+        array.shift(swingLowBars)
+        line.delete(array.shift(slLines))
+
+// Extend active lines
+if array.size(shLines) > 0
+    for i = 0 to array.size(shLines) - 1
+        line.set_x2(array.get(shLines, i), bar_index)
+
+if array.size(slLines) > 0
+    for i = 0 to array.size(slLines) - 1
+        line.set_x2(array.get(slLines, i), bar_index)
+
+// Remove swept levels and detect sweeps
+bullSweep = false
+bearSweep = false
+
+// Check for bearish sweep (price pierces swing high then closes below)
+if array.size(swingHighs) > 0 and showSweeps
+    for i = array.size(swingHighs) - 1 to 0
+        shPrice = array.get(swingHighs, i)
+        if high > shPrice and close < shPrice
+            bearSweep := true
+            // Remove the swept level
+            line.delete(array.get(shLines, i))
+            array.remove(swingHighs, i)
+            array.remove(swingHighBars, i)
+            array.remove(shLines, i)
+            break
+
+// Check for bullish sweep (price pierces swing low then closes above)
+if array.size(swingLows) > 0 and showSweeps
+    for i = array.size(swingLows) - 1 to 0
+        slPrice = array.get(swingLows, i)
+        if low < slPrice and close > slPrice
+            bullSweep := true
+            line.delete(array.get(slLines, i))
+            array.remove(swingLows, i)
+            array.remove(swingLowBars, i)
+            array.remove(slLines, i)
+            break
+
+// Plot sweep signals
+plotshape(bullSweep and showSweeps, title="Bull Sweep (Stop Hunt)", style=shape.labelup, location=location.belowbar, color=color.green, text="SWEEP", textcolor=color.white, size=size.small)
+plotshape(bearSweep and showSweeps, title="Bear Sweep (Stop Hunt)", style=shape.labeldown, location=location.abovebar, color=color.red, text="SWEEP", textcolor=color.white, size=size.small)
+
+// =============================================================================
+// Market Structure
+// =============================================================================
+var float lastSH = na
+var float prevSH = na
+var float lastSL = na
+var float prevSL = na
+var int structure = 0  // 1=bullish, -1=bearish, 0=ranging
+
+if not na(isSwingHigh)
+    prevSH := lastSH
+    lastSH := isSwingHigh
+
+if not na(isSwingLow)
+    prevSL := lastSL
+    lastSL := isSwingLow
+
+// Higher High + Higher Low = Bullish
+hh = not na(prevSH) and not na(lastSH) and lastSH > prevSH
+hl = not na(prevSL) and not na(lastSL) and lastSL > prevSL
+
+// Lower High + Lower Low = Bearish
+lh = not na(prevSH) and not na(lastSH) and lastSH < prevSH
+ll = not na(prevSL) and not na(lastSL) and lastSL < prevSL
+
+newBullish = hh and hl
+newBearish = lh and ll
+
+prevStructure = structure
+if newBullish
+    structure := 1
+if newBearish
+    structure := -1
+
+// Break of Structure
+bosUp = structure == 1 and prevStructure != 1
+bosDown = structure == -1 and prevStructure != -1
+
+// BOS labels
+if bosUp and showBOS
+    label.new(bar_index, low, "BOS", color=color.green, textcolor=color.white, style=label.style_label_up, size=size.small)
+
+if bosDown and showBOS
+    label.new(bar_index, high, "BOS", color=color.red, textcolor=color.white, style=label.style_label_down, size=size.small)
+
+// Structure background
+bgcolor(showStructure and structure == 1 ? color.new(color.green, 95) : showStructure and structure == -1 ? color.new(color.red, 95) : na)

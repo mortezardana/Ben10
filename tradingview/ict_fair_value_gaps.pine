@@ -1,0 +1,103 @@
+// =============================================================================
+// ICT Fair Value Gaps (FVG) — Ben10
+// =============================================================================
+// Detects bullish and bearish Fair Value Gaps and draws them on chart.
+// FVGs are filled (removed) when price retraces to the midpoint.
+//
+// Bullish FVG: high[2] < low[0]  (gap up)
+// Bearish FVG: low[2] > high[0]  (gap down)
+// =============================================================================
+
+//@version=6
+indicator("ICT Fair Value Gaps", overlay=true, max_boxes_count=500)
+
+// Inputs
+maxAge      = input.int(50, "Max FVG Age (bars)", minval=5, maxval=200)
+showBullish = input.bool(true, "Show Bullish FVGs")
+showBearish = input.bool(true, "Show Bearish FVGs")
+fillOnMid   = input.bool(true, "Fill on Midpoint Touch (vs Full Fill)")
+bullColor   = input.color(color.new(color.green, 80), "Bullish FVG Color")
+bearColor   = input.color(color.new(color.red, 80), "Bearish FVG Color")
+
+// Track FVGs using arrays
+var box[] bullBoxes = array.new_box()
+var float[] bullTops = array.new_float()
+var float[] bullBottoms = array.new_float()
+var int[] bullBars = array.new_int()
+
+var box[] bearBoxes = array.new_box()
+var float[] bearTops = array.new_float()
+var float[] bearBottoms = array.new_float()
+var int[] bearBars = array.new_int()
+
+// Detect Bullish FVG: candle 2 high < current candle low
+bullFVG = high[2] < low
+if bullFVG and showBullish
+    top = low
+    bottom = high[2]
+    mid = (top + bottom) / 2
+    b = box.new(bar_index - 2, top, bar_index, bottom, bgcolor=bullColor, border_color=color.green, border_width=1)
+    array.push(bullBoxes, b)
+    array.push(bullTops, top)
+    array.push(bullBottoms, bottom)
+    array.push(bullBars, bar_index)
+
+// Detect Bearish FVG: candle 2 low > current candle high
+bearFVG = low[2] > high
+if bearFVG and showBearish
+    top = low[2]
+    bottom = high
+    b = box.new(bar_index - 2, top, bar_index, bottom, bgcolor=bearColor, border_color=color.red, border_width=1)
+    array.push(bearBoxes, b)
+    array.push(bearTops, top)
+    array.push(bearBottoms, bottom)
+    array.push(bearBars, bar_index)
+
+// Remove filled or expired bullish FVGs
+if array.size(bullBoxes) > 0
+    for i = array.size(bullBoxes) - 1 to 0
+        top = array.get(bullTops, i)
+        bottom = array.get(bullBottoms, i)
+        mid = (top + bottom) / 2
+        age = bar_index - array.get(bullBars, i)
+        threshold = fillOnMid ? mid : bottom
+
+        if low <= threshold or age > maxAge
+            box.delete(array.get(bullBoxes, i))
+            array.remove(bullBoxes, i)
+            array.remove(bullTops, i)
+            array.remove(bullBottoms, i)
+            array.remove(bullBars, i)
+        else
+            // Extend box to current bar
+            box.set_right(array.get(bullBoxes, i), bar_index)
+
+// Remove filled or expired bearish FVGs
+if array.size(bearBoxes) > 0
+    for i = array.size(bearBoxes) - 1 to 0
+        top = array.get(bearTops, i)
+        bottom = array.get(bearBottoms, i)
+        mid = (top + bottom) / 2
+        age = bar_index - array.get(bearBars, i)
+        threshold = fillOnMid ? mid : top
+
+        if high >= threshold or age > maxAge
+            box.delete(array.get(bearBoxes, i))
+            array.remove(bearBoxes, i)
+            array.remove(bearTops, i)
+            array.remove(bearBottoms, i)
+            array.remove(bearBars, i)
+        else
+            box.set_right(array.get(bearBoxes, i), bar_index)
+
+// Plot signals
+plotshape(bullFVG, title="Bullish FVG", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.tiny)
+plotshape(bearFVG, title="Bearish FVG", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.tiny)
+
+// Info table
+var table infoTable = table.new(position.top_right, 2, 3, bgcolor=color.new(color.black, 80))
+if barstate.islast
+    table.cell(infoTable, 0, 0, "Open Bull FVGs", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 0, str.tostring(array.size(bullBoxes)), text_color=color.green, text_size=size.small)
+    table.cell(infoTable, 0, 1, "Open Bear FVGs", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 1, str.tostring(array.size(bearBoxes)), text_color=color.red, text_size=size.small)

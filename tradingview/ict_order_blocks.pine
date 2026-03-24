@@ -1,0 +1,120 @@
+// =============================================================================
+// ICT Order Blocks & Displacement — Ben10
+// =============================================================================
+// Detects order blocks (last opposing candle before a displacement move)
+// and highlights displacement candles.
+//
+// Bullish OB: last red candle before a bullish displacement (>1.5x ATR)
+// Bearish OB: last green candle before a bearish displacement
+// =============================================================================
+
+//@version=6
+indicator("ICT Order Blocks", overlay=true, max_boxes_count=500)
+
+// Inputs
+atrLength       = input.int(14, "ATR Length")
+dispMultiplier  = input.float(1.5, "Displacement Multiplier (x ATR)", step=0.1)
+maxOBAge        = input.int(100, "Max OB Age (bars)")
+showBullOB      = input.bool(true, "Show Bullish OBs")
+showBearOB      = input.bool(true, "Show Bearish OBs")
+showDisp        = input.bool(true, "Highlight Displacement Candles")
+bullOBColor     = input.color(color.new(color.teal, 75), "Bullish OB Color")
+bearOBColor     = input.color(color.new(color.orange, 75), "Bearish OB Color")
+
+atr = ta.atr(atrLength)
+
+// Displacement detection
+moveSize = close - open
+isBullDisp = moveSize > dispMultiplier * atr
+isBearDisp = moveSize < -dispMultiplier * atr
+
+// Candle properties
+isBearCandle = close < open
+isBullCandle = close > open
+
+// Track order blocks
+var box[] bullOBBoxes = array.new_box()
+var float[] bullOBTops = array.new_float()
+var float[] bullOBBottoms = array.new_float()
+var int[] bullOBBars = array.new_int()
+
+var box[] bearOBBoxes = array.new_box()
+var float[] bearOBTops = array.new_float()
+var float[] bearOBBottoms = array.new_float()
+var int[] bearOBBars = array.new_int()
+
+// Detect Bullish OB: find last bearish candle before bullish displacement
+if isBullDisp and showBullOB
+    // Look back up to 4 bars for a bearish candle
+    obBar = -1
+    obHigh = 0.0
+    obLow = 0.0
+    for j = 1 to 4
+        if isBearCandle[j]
+            obBar = bar_index - j
+            obHigh := high[j]
+            obLow := low[j]
+            break
+    if obBar != -1
+        b = box.new(obBar, obHigh, bar_index, obLow, bgcolor=bullOBColor, border_color=color.teal, border_width=2)
+        array.push(bullOBBoxes, b)
+        array.push(bullOBTops, obHigh)
+        array.push(bullOBBottoms, obLow)
+        array.push(bullOBBars, obBar)
+
+// Detect Bearish OB: find last bullish candle before bearish displacement
+if isBearDisp and showBearOB
+    obBar = -1
+    obHigh = 0.0
+    obLow = 0.0
+    for j = 1 to 4
+        if isBullCandle[j]
+            obBar = bar_index - j
+            obHigh := high[j]
+            obLow := low[j]
+            break
+    if obBar != -1
+        b = box.new(obBar, obHigh, bar_index, obLow, bgcolor=bearOBColor, border_color=color.orange, border_width=2)
+        array.push(bearOBBoxes, b)
+        array.push(bearOBTops, obHigh)
+        array.push(bearOBBottoms, obLow)
+        array.push(bearOBBars, obBar)
+
+// Remove mitigated or expired bullish OBs (price returned and tested the zone)
+if array.size(bullOBBoxes) > 0
+    for i = array.size(bullOBBoxes) - 1 to 0
+        obTop = array.get(bullOBTops, i)
+        obBottom = array.get(bullOBBottoms, i)
+        age = bar_index - array.get(bullOBBars, i)
+        // Mitigated when price closes below OB bottom
+        if close < obBottom or age > maxOBAge
+            box.delete(array.get(bullOBBoxes, i))
+            array.remove(bullOBBoxes, i)
+            array.remove(bullOBTops, i)
+            array.remove(bullOBBottoms, i)
+            array.remove(bullOBBars, i)
+        else
+            box.set_right(array.get(bullOBBoxes, i), bar_index)
+
+// Remove mitigated or expired bearish OBs
+if array.size(bearOBBoxes) > 0
+    for i = array.size(bearOBBoxes) - 1 to 0
+        obTop = array.get(bearOBTops, i)
+        obBottom = array.get(bearOBBottoms, i)
+        age = bar_index - array.get(bearOBBars, i)
+        if close > obTop or age > maxOBAge
+            box.delete(array.get(bearOBBoxes, i))
+            array.remove(bearOBBoxes, i)
+            array.remove(bearOBTops, i)
+            array.remove(bearOBBottoms, i)
+            array.remove(bearOBBars, i)
+        else
+            box.set_right(array.get(bearOBBoxes, i), bar_index)
+
+// Highlight displacement candles
+barcolor(showDisp and isBullDisp ? color.new(color.lime, 30) : na)
+barcolor(showDisp and isBearDisp ? color.new(color.fuchsia, 30) : na)
+
+// Labels for displacement
+plotshape(isBullDisp, title="Bull Displacement", style=shape.diamond, location=location.abovebar, color=color.lime, size=size.tiny)
+plotshape(isBearDisp, title="Bear Displacement", style=shape.diamond, location=location.belowbar, color=color.fuchsia, size=size.tiny)

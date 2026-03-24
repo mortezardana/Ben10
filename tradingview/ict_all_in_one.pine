@@ -1,0 +1,299 @@
+// =============================================================================
+// ICT All-In-One Dashboard — Ben10
+// =============================================================================
+// Combined indicator with toggleable ICT features:
+// - Fair Value Gaps (FVG)
+// - Order Blocks (OB)
+// - Liquidity Sweeps
+// - Market Structure + BOS
+// - Killzones
+// - Displacement
+// =============================================================================
+
+//@version=6
+indicator("ICT All-In-One [Ben10]", overlay=true, max_boxes_count=500, max_lines_count=500, max_labels_count=500)
+
+// === MASTER TOGGLES ===
+grpFVG  = "Fair Value Gaps"
+grpOB   = "Order Blocks"
+grpLiq  = "Liquidity & Sweeps"
+grpMS   = "Market Structure"
+grpKZ   = "Killzones"
+grpDisp = "Displacement"
+
+showFVG      = input.bool(true, "Enable FVGs", group=grpFVG)
+fvgMaxAge    = input.int(50, "FVG Max Age", group=grpFVG, minval=5)
+bullFVGCol   = input.color(color.new(color.green, 82), "Bull FVG", group=grpFVG)
+bearFVGCol   = input.color(color.new(color.red, 82), "Bear FVG", group=grpFVG)
+
+showOB       = input.bool(true, "Enable Order Blocks", group=grpOB)
+dispMult     = input.float(1.5, "Displacement Mult (x ATR)", group=grpOB, step=0.1)
+obMaxAge     = input.int(100, "OB Max Age", group=grpOB)
+bullOBCol    = input.color(color.new(color.teal, 75), "Bull OB", group=grpOB)
+bearOBCol    = input.color(color.new(color.orange, 75), "Bear OB", group=grpOB)
+
+showLiq      = input.bool(true, "Enable Liquidity", group=grpLiq)
+swingLen     = input.int(10, "Swing Period", group=grpLiq, minval=3)
+showSweeps   = input.bool(true, "Show Sweeps", group=grpLiq)
+
+showMS       = input.bool(true, "Enable Structure", group=grpMS)
+showBOS      = input.bool(true, "Show BOS Labels", group=grpMS)
+
+showKZ       = input.bool(false, "Enable Killzones", group=grpKZ)
+
+showDispHL   = input.bool(true, "Highlight Displacement", group=grpDisp)
+
+atrLen = input.int(14, "ATR Length")
+atr = ta.atr(atrLen)
+
+// =============================================================================
+// FAIR VALUE GAPS
+// =============================================================================
+var box[] bFVG = array.new_box()
+var float[] bFVGt = array.new_float()
+var float[] bFVGb = array.new_float()
+var int[] bFVGbar = array.new_int()
+
+var box[] sFVG = array.new_box()
+var float[] sFVGt = array.new_float()
+var float[] sFVGb = array.new_float()
+var int[] sFVGbar = array.new_int()
+
+bullFvg = high[2] < low
+bearFvg = low[2] > high
+
+if bullFvg and showFVG
+    b = box.new(bar_index - 2, low, bar_index, high[2], bgcolor=bullFVGCol, border_color=color.green, border_width=1)
+    array.push(bFVG, b)
+    array.push(bFVGt, low)
+    array.push(bFVGb, high[2])
+    array.push(bFVGbar, bar_index)
+
+if bearFvg and showFVG
+    b = box.new(bar_index - 2, low[2], bar_index, high, bgcolor=bearFVGCol, border_color=color.red, border_width=1)
+    array.push(sFVG, b)
+    array.push(sFVGt, low[2])
+    array.push(sFVGb, high)
+    array.push(sFVGbar, bar_index)
+
+// Manage bull FVGs
+if array.size(bFVG) > 0
+    for i = array.size(bFVG) - 1 to 0
+        t = array.get(bFVGt, i)
+        bt = array.get(bFVGb, i)
+        mid = (t + bt) / 2
+        age = bar_index - array.get(bFVGbar, i)
+        if (age > 0 and low <= mid) or age > fvgMaxAge
+            box.delete(array.get(bFVG, i))
+            array.remove(bFVG, i)
+            array.remove(bFVGt, i)
+            array.remove(bFVGb, i)
+            array.remove(bFVGbar, i)
+        else
+            box.set_right(array.get(bFVG, i), bar_index)
+
+// Manage bear FVGs
+if array.size(sFVG) > 0
+    for i = array.size(sFVG) - 1 to 0
+        t = array.get(sFVGt, i)
+        bt = array.get(sFVGb, i)
+        mid = (t + bt) / 2
+        age = bar_index - array.get(sFVGbar, i)
+        if (age > 0 and high >= mid) or age > fvgMaxAge
+            box.delete(array.get(sFVG, i))
+            array.remove(sFVG, i)
+            array.remove(sFVGt, i)
+            array.remove(sFVGb, i)
+            array.remove(sFVGbar, i)
+        else
+            box.set_right(array.get(sFVG, i), bar_index)
+
+// =============================================================================
+// ORDER BLOCKS
+// =============================================================================
+moveSize = close - open
+isBullDisp = moveSize > dispMult * atr
+isBearDisp = moveSize < -dispMult * atr
+
+var box[] bOB = array.new_box()
+var float[] bOBt = array.new_float()
+var float[] bOBb = array.new_float()
+var int[] bOBbar = array.new_int()
+
+var box[] sOB = array.new_box()
+var float[] sOBt = array.new_float()
+var float[] sOBb = array.new_float()
+var int[] sOBbar = array.new_int()
+
+if isBullDisp and showOB
+    for j = 1 to 4
+        if close[j] < open[j]  // bearish candle
+            b = box.new(bar_index - j, high[j], bar_index, low[j], bgcolor=bullOBCol, border_color=color.teal, border_width=2)
+            array.push(bOB, b)
+            array.push(bOBt, high[j])
+            array.push(bOBb, low[j])
+            array.push(bOBbar, bar_index - j)
+            break
+
+if isBearDisp and showOB
+    for j = 1 to 4
+        if close[j] > open[j]  // bullish candle
+            b = box.new(bar_index - j, high[j], bar_index, low[j], bgcolor=bearOBCol, border_color=color.orange, border_width=2)
+            array.push(sOB, b)
+            array.push(sOBt, high[j])
+            array.push(sOBb, low[j])
+            array.push(sOBbar, bar_index - j)
+            break
+
+// Manage OBs
+if array.size(bOB) > 0
+    for i = array.size(bOB) - 1 to 0
+        age = bar_index - array.get(bOBbar, i)
+        if close < array.get(bOBb, i) or age > obMaxAge
+            box.delete(array.get(bOB, i))
+            array.remove(bOB, i)
+            array.remove(bOBt, i)
+            array.remove(bOBb, i)
+            array.remove(bOBbar, i)
+        else
+            box.set_right(array.get(bOB, i), bar_index)
+
+if array.size(sOB) > 0
+    for i = array.size(sOB) - 1 to 0
+        age = bar_index - array.get(sOBbar, i)
+        if close > array.get(sOBt, i) or age > obMaxAge
+            box.delete(array.get(sOB, i))
+            array.remove(sOB, i)
+            array.remove(sOBt, i)
+            array.remove(sOBb, i)
+            array.remove(sOBbar, i)
+        else
+            box.set_right(array.get(sOB, i), bar_index)
+
+// =============================================================================
+// LIQUIDITY & SWEEPS
+// =============================================================================
+pivHi = ta.pivothigh(high, swingLen, swingLen)
+pivLo = ta.pivotlow(low, swingLen, swingLen)
+
+var line[] hiLines = array.new_line()
+var float[] hiPrices = array.new_float()
+
+var line[] loLines = array.new_line()
+var float[] loPrices = array.new_float()
+
+maxLevels = 15
+
+if not na(pivHi) and showLiq
+    l = line.new(bar_index - swingLen, pivHi, bar_index, pivHi, color=color.new(color.red, 50), style=line.style_dashed, width=1)
+    array.push(hiLines, l)
+    array.push(hiPrices, pivHi)
+    if array.size(hiLines) > maxLevels
+        line.delete(array.shift(hiLines))
+        array.shift(hiPrices)
+
+if not na(pivLo) and showLiq
+    l = line.new(bar_index - swingLen, pivLo, bar_index, pivLo, color=color.new(color.green, 50), style=line.style_dashed, width=1)
+    array.push(loLines, l)
+    array.push(loPrices, pivLo)
+    if array.size(loLines) > maxLevels
+        line.delete(array.shift(loLines))
+        array.shift(loPrices)
+
+// Extend lines
+if array.size(hiLines) > 0
+    for i = 0 to array.size(hiLines) - 1
+        line.set_x2(array.get(hiLines, i), bar_index)
+if array.size(loLines) > 0
+    for i = 0 to array.size(loLines) - 1
+        line.set_x2(array.get(loLines, i), bar_index)
+
+// Sweep detection
+bullSweep = false
+bearSweep = false
+
+if array.size(loPrices) > 0 and showSweeps
+    for i = array.size(loPrices) - 1 to 0
+        if low < array.get(loPrices, i) and close > array.get(loPrices, i)
+            bullSweep := true
+            line.delete(array.get(loLines, i))
+            array.remove(loLines, i)
+            array.remove(loPrices, i)
+            break
+
+if array.size(hiPrices) > 0 and showSweeps
+    for i = array.size(hiPrices) - 1 to 0
+        if high > array.get(hiPrices, i) and close < array.get(hiPrices, i)
+            bearSweep := true
+            line.delete(array.get(hiLines, i))
+            array.remove(hiLines, i)
+            array.remove(hiPrices, i)
+            break
+
+plotshape(bullSweep, title="Bull Sweep", style=shape.labelup, location=location.belowbar, color=color.green, text="SWEEP", textcolor=color.white, size=size.tiny)
+plotshape(bearSweep, title="Bear Sweep", style=shape.labeldown, location=location.abovebar, color=color.red, text="SWEEP", textcolor=color.white, size=size.tiny)
+
+// =============================================================================
+// MARKET STRUCTURE
+// =============================================================================
+var float lastSH = na
+var float prevSH = na
+var float lastSL = na
+var float prevSL = na
+var int struct = 0
+
+if not na(pivHi)
+    prevSH := lastSH
+    lastSH := pivHi
+if not na(pivLo)
+    prevSL := lastSL
+    lastSL := pivLo
+
+hh = not na(prevSH) and lastSH > prevSH
+hl = not na(prevSL) and lastSL > prevSL
+lh = not na(prevSH) and lastSH < prevSH
+ll = not na(prevSL) and lastSL < prevSL
+
+prevStruct = struct
+if hh and hl
+    struct := 1
+if lh and ll
+    struct := -1
+
+bosUp = struct == 1 and prevStruct != 1
+bosDown = struct == -1 and prevStruct != -1
+
+if bosUp and showBOS
+    label.new(bar_index, low, "BOS", color=color.green, textcolor=color.white, style=label.style_label_up, size=size.tiny)
+if bosDown and showBOS
+    label.new(bar_index, high, "BOS", color=color.red, textcolor=color.white, style=label.style_label_down, size=size.tiny)
+
+bgcolor(showMS and struct == 1 ? color.new(color.green, 95) : showMS and struct == -1 ? color.new(color.red, 95) : na, title="Structure BG")
+
+// =============================================================================
+// KILLZONES
+// =============================================================================
+h = hour(time, "America/New_York")
+bgcolor(showKZ and (h >= 2 and h < 5) ? color.new(color.blue, 93) : na, title="London KZ")
+bgcolor(showKZ and (h >= 7 and h < 10) ? color.new(color.orange, 93) : na, title="NY KZ")
+
+// =============================================================================
+// DISPLACEMENT HIGHLIGHT
+// =============================================================================
+barcolor(showDispHL and isBullDisp ? color.lime : showDispHL and isBearDisp ? color.fuchsia : na, title="Displacement")
+
+// =============================================================================
+// INFO TABLE
+// =============================================================================
+var table dash = table.new(position.top_right, 2, 5, bgcolor=color.new(color.black, 80), border_width=1)
+if barstate.islast
+    table.cell(dash, 0, 0, "Structure", text_color=color.white, text_size=size.small)
+    table.cell(dash, 1, 0, struct == 1 ? "BULLISH" : struct == -1 ? "BEARISH" : "RANGING", text_color=struct == 1 ? color.green : struct == -1 ? color.red : color.gray, text_size=size.small)
+    table.cell(dash, 0, 1, "Open Bull FVGs", text_color=color.white, text_size=size.small)
+    table.cell(dash, 1, 1, str.tostring(array.size(bFVG)), text_color=color.green, text_size=size.small)
+    table.cell(dash, 0, 2, "Open Bear FVGs", text_color=color.white, text_size=size.small)
+    table.cell(dash, 1, 2, str.tostring(array.size(sFVG)), text_color=color.red, text_size=size.small)
+    table.cell(dash, 0, 3, "Bull OBs", text_color=color.white, text_size=size.small)
+    table.cell(dash, 1, 3, str.tostring(array.size(bOB)), text_color=color.teal, text_size=size.small)
+    table.cell(dash, 0, 4, "Bear OBs", text_color=color.white, text_size=size.small)
+    table.cell(dash, 1, 4, str.tostring(array.size(sOB)), text_color=color.orange, text_size=size.small)
