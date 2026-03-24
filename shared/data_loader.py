@@ -57,8 +57,17 @@ def load_gold_data(config=None):
         df[date_col] = pd.to_datetime(df[date_col])
         df = df.sort_values(date_col).reset_index(drop=True)
 
-    # Feature reduction
+    # Feature reduction (drop CDL, redundant, correlated)
     df = reduce_features(df)
+
+    # Add ICT (smart money) features — computed from OHLCV before target creation
+    try:
+        from shared.features.ict import compute_all_ict_features
+        ict_features = compute_all_ict_features(df)
+        df = pd.concat([df, ict_features], axis=1)
+        logger.info(f"Added {len(ict_features.columns)} ICT features")
+    except Exception as e:
+        logger.warning(f"ICT features skipped: {e}")
 
     # Create target
     df['target'] = (df['Close'].shift(-1) > df['Close']).astype(int)

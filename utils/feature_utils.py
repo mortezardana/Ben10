@@ -62,10 +62,49 @@ def get_feature_report(df, exclude_cols=None):
     }
 
 
+def drop_redundant_features(df):
+    """
+    Drop features that are redundant, near-constant, or questionable.
+
+    Keeps the most informative representative from each group:
+      Momentum:    roc, pct_change          (drop mom, pct_change2, pct_change5)
+      Volatility:  atr, natr                (drop stddev, var, volatility, volatility2, trange)
+      Stochastic:  stoch_d, stochrsi_k      (drop stochf_d, stochf_k, stochrsi_d)
+      Directional: adx, plus_di, minus_di   (drop adxr, dx, plus_dm, minus_dm)
+      Hilbert:     ht_dcperiod, ht_sine     (drop ht_dcphase, ht_inphase, ht_quadrature, ht_leadsine, ht_trendmode)
+      Other:       drop sum, sarext, corr, minmaxindex_min, ad, obv
+    """
+    redundant = [
+        # Redundant momentum — roc and pct_change are enough
+        'mom', 'pct_change2', 'pct_change5',
+        # Redundant volatility — atr and natr capture this
+        'stddev', 'var', 'volatility', 'volatility2', 'trange',
+        # Redundant stochastic — stoch_d and stochrsi_k are sufficient
+        'stochf_d', 'stochf_k', 'stochrsi_d',
+        # Redundant directional — adx, plus_di, minus_di cover it
+        'adxr', 'dx', 'plus_dm', 'minus_dm',
+        # Noisy Hilbert Transform features — keep ht_dcperiod and ht_sine
+        'ht_dcphase', 'ht_inphase', 'ht_quadrature', 'ht_leadsine', 'ht_trendmode',
+        # Near-constant or index-based
+        'minmaxindex_min',
+        # Non-stationary cumulative (need differencing to be useful, raw values hurt)
+        'ad', 'obv',
+        # Low-information or scale-dependent
+        'sum', 'sarext', 'corr',
+    ]
+
+    to_drop = [c for c in redundant if c in df.columns]
+    if to_drop:
+        logger.info(f"Dropping {len(to_drop)} redundant features: {sorted(to_drop)}")
+        df = df.drop(columns=to_drop)
+    return df
+
+
 def reduce_features(df, corr_threshold=0.95):
-    """Apply full feature reduction pipeline: drop CDL, then correlated features."""
+    """Apply full feature reduction pipeline: CDL -> redundant -> correlated."""
     original_count = len(df.columns)
     df = drop_cdl_columns(df)
+    df = drop_redundant_features(df)
     df = drop_correlated_features(df, threshold=corr_threshold)
     final_count = len(df.columns)
     logger.info(f"Feature reduction: {original_count} -> {final_count} columns")
