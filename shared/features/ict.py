@@ -557,5 +557,19 @@ def compute_all_ict_features(df, atr_col='atr'):
     # Combine all
     result = pd.concat([fvg, fvg_advanced, ob, liq, ms, kz, disp], axis=1)
 
+    # Fill NaN with sensible defaults so dropna() doesn't kill rows
+    # Distance features: NaN means "no nearby level" -> use large value (10 ATR)
+    dist_cols = [c for c in result.columns if 'dist' in c or 'nearest' in c]
+    for c in dist_cols:
+        result[c] = result[c].fillna(10.0)
+
+    # Count features: NaN -> 0
+    count_cols = [c for c in result.columns if 'count' in c or 'levels' in c]
+    for c in count_cols:
+        result[c] = result[c].fillna(0)
+
+    # Remaining NaN -> 0 (binary signals, strength, etc.)
+    result = result.fillna(0)
+
     logger.info(f"ICT features computed: {len(result.columns)} features")
     return result
